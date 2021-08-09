@@ -1,0 +1,4 @@
+[MASTER]
+
+[MESSAGES CONTROL]
+disable=locally-disabled,missing-module-docstring,missing-class-docstring,missing-function-docstring,invalid-name

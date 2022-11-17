@@ -2,6 +2,7 @@ import getpass
 import hashlib
 import os
 import sys
+import tarfile
 from configparser import RawConfigParser
 from io import BytesIO
 
@@ -214,11 +215,13 @@ def check_app_for_update(ctx, splunk_version, app_dir):
 @cli.command()
 @click.option("--output-path", required=False,
               help="Path and filename location to save the app")
-@click.option("--version", required=False,
+@click.option("--version", "-v", required=False,
               help="Version of app to download, default is latest")
+@click.option("--untar", "-u", is_flag=True, required=False,
+              help="Untars the app and removes the tarball")
 @click.argument("app_name", nargs=1, required=True)
 @click.pass_context
-def download_app(ctx, output_path, version, app_name):
+def download_app(ctx, output_path, version, app_name, untar):
     try:
         result = ctx.obj.download_app(app_name, version)
     except AppNotFound:
@@ -239,6 +242,12 @@ def download_app(ctx, output_path, version, app_name):
     else:
         with open(output_path, "wb") as f:
             f.write(result["app"].read())
+
+    if untar:
+        tar = tarfile.open(output_path)
+        tar.extractall()
+        tar.close()
+        os.remove(output_path)
 
     return 0
 

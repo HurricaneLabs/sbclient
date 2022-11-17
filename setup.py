@@ -11,8 +11,8 @@ with open("README.md", "r") as f:
 setup(
     name="sbclient",
     version=VERSION,
-    author="Steve McMaster",
-    author_email="mcmaster@hurricanelabs.com",
+    author="Hurricane Labs",
+    author_email="dev@hurricanelabs.com",
     py_modules=["sbclient"],
     description="sbclient - CLI Splunkbase client",
     long_description=long_description,

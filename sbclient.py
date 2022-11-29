@@ -3,6 +3,7 @@ import hashlib
 import os
 import sys
 import tarfile
+import json
 from configparser import RawConfigParser
 from io import BytesIO
 
@@ -70,21 +71,23 @@ class SplunkbaseSession(requests.Session):
 
         return r.headers["Location"].split("/")[-1]
 
+    def get_app_info_by_id(self, app_id):
+        if app_id is None:
+            # Didn't find the app
+            return None
+        r = self.get(
+            "/api/v1/app/%s/" % app_id,
+            params={"include": "all"}
+        )
+        if r.status_code != 200:
+            # Didn't find the app
+            return None
+        return r.json()
+
     def get_app_info(self, app_name):
         if app_name not in self.__app_info:
             app_id = self.get_app_numeric_id(app_name)
-            if app_id is None:
-                # Didn't find the app
-                return None
-
-            r = self.get(
-                "/api/v1/app/%s/" % app_id,
-                params={"include": "all"}
-            )
-            if r.status_code != 200:
-                # Didn't find the app
-                return None
-            self.__app_info[app_name] = r.json()
+            self.__app_info[app_name] = self.get_app_info_by_id(app_id)
 
         return self.__app_info[app_name]
 
@@ -275,4 +278,22 @@ def get_latest_version(ctx, splunk_version, app_name):
     print("Supported Splunk Versions:")
     print(" ".join(release["splunk_compatibility"]))
 
+    return 0
+
+
+@cli.command()
+@click.argument("app_name", nargs=1, required=True,)
+@click.pass_context
+def get_app_info(ctx, app_name):
+    app_info = ctx.obj.get_app_info(app_name)
+    print(json.dumps(app_info, indent=4))
+    return 0
+
+
+@cli.command()
+@click.argument("app_id", nargs=1, required=True,)
+@click.pass_context
+def get_app_info_by_id(ctx, app_id):
+    app_info = ctx.obj.get_app_info_by_id(app_id)
+    print(json.dumps(app_info, indent=4))
     return 0

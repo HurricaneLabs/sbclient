@@ -3,6 +3,7 @@ import hashlib
 import os
 import sys
 import tarfile
+import json
 from configparser import RawConfigParser
 from io import BytesIO
 
@@ -70,25 +71,27 @@ class SplunkbaseSession(requests.Session):
 
         return r.headers["Location"].split("/")[-1]
 
+    def get_app_info_by_id(self, app_id):
+        if app_id is None:
+            # Didn't find the app
+            return None
+        r = self.get(
+            "/api/v1/app/%s/" % app_id,
+            params={"include": "all"}
+        )
+        if r.status_code != 200:
+            # Didn't find the app
+            return None
+        return r.json()
+
     def get_app_info(self, app_name):
         if app_name not in self.__app_info:
             app_id = self.get_app_numeric_id(app_name)
-            if app_id is None:
-                # Didn't find the app
-                return None
-
-            r = self.get(
-                "/api/v1/app/%s/" % app_id,
-                params={"include": "all"}
-            )
-            if r.status_code != 200:
-                # Didn't find the app
-                return None
-            self.__app_info[app_name] = r.json()
+            self.__app_info[app_name] = self.get_app_info_by_id(app_id)
 
         return self.__app_info[app_name]
 
-    def download_app(self, app_name, version=None):
+    def download_app(self, app_name, version=None, output_path=None):
         data = self.get_app_info(app_name)
 
         if data is None:
@@ -109,37 +112,41 @@ class SplunkbaseSession(requests.Session):
             if release is None:
                 raise VersionNotFound
 
-        app_data = {}
-
         for checksum_type in ("sha256", "md5"):
             if checksum_type in release:
-                app_data["checksum"] = release[checksum_type]
+                app_checksum = release[checksum_type]
                 break
 
         r = self.get(
-            release["path"]
+            release["path"], stream=True
         )
         if r.status_code != 200:
             raise DownloadFailed(r)
 
-        if "checksum" in app_data and checksum_type in release:
+        if output_path is None:
+            output_path = "%s-%s.tgz" % (app_name, release["title"])
+
+        if app_checksum:
             h = hashlib.new(checksum_type)
-            h.update(r.content)
+
+        f = sys.stdout.buffer if output_path == "-" else open(output_path, 'wb')
+        for chunk in r.iter_content(1024):
+            if app_checksum:
+                h.update(chunk)
+            f.write(chunk)
+
+        if f is not sys.stdout.buffer:
+            f.close()
+
+        if app_checksum:
             checksum = h.hexdigest()
-            if checksum != app_data["checksum"]:
+            if checksum != app_checksum:
                 raise DownloadFailed("Checksum mismatch: expected %s, got %s" % (
-                    app_data["checksum"],
+                    app_checksum,
                     checksum
                 ))
 
-        return {
-            "version": release["title"],
-            "app": BytesIO(r.content),
-            "author": release["manifest"]["info"]["author"][0],
-            "appid": data["appid"],
-            "release_notes": release["notes"],
-            "release_date": dateparse(release["published_time"])
-        }
+        return output_path
 
     def get_app_latest_version(self, app_name, splunk_version=None):
         app_info = self.get_app_info(app_name)
@@ -213,7 +220,7 @@ def check_app_for_update(ctx, splunk_version, app_dir):
 
 
 @cli.command()
-@click.option("--output-path", required=False,
+@click.option("--output-path", "-o", required=False,
               help="Path and filename location to save the app")
 @click.option("--version", "-v", required=False,
               help="Version of app to download, default is latest")
@@ -223,7 +230,7 @@ def check_app_for_update(ctx, splunk_version, app_dir):
 @click.pass_context
 def download_app(ctx, output_path, version, app_name, untar):
     try:
-        result = ctx.obj.download_app(app_name, version)
+        output_path = ctx.obj.download_app(app_name, version, output_path)
     except AppNotFound:
         print("App '%s' not found on Splunkbase" % app_name)
         return 1
@@ -234,16 +241,7 @@ def download_app(ctx, output_path, version, app_name, untar):
         print(repr(DownloadFailed))
         return 1
 
-    if output_path is None:
-        output_path = "%s-%s.tgz" % (app_name, result["version"])
-
-    if output_path == "-":
-        sys.stdout.buffer.write(result["app"].read())
-    else:
-        with open(output_path, "wb") as f:
-            f.write(result["app"].read())
-
-    if untar:
+    if untar and output_path != "-":
         tar = tarfile.open(output_path)
         tar.extractall()
         tar.close()
@@ -275,4 +273,22 @@ def get_latest_version(ctx, splunk_version, app_name):
     print("Supported Splunk Versions:")
     print(" ".join(release["splunk_compatibility"]))
 
+    return 0
+
+
+@cli.command()
+@click.argument("app_name", nargs=1, required=True,)
+@click.pass_context
+def get_app_info(ctx, app_name):
+    app_info = ctx.obj.get_app_info(app_name)
+    print(json.dumps(app_info, indent=4))
+    return 0
+
+
+@cli.command()
+@click.argument("app_id", nargs=1, required=True,)
+@click.pass_context
+def get_app_info_by_id(ctx, app_id):
+    app_info = ctx.obj.get_app_info_by_id(app_id)
+    print(json.dumps(app_info, indent=4))
     return 0

@@ -26,6 +26,8 @@ github:
     Commands:
       check-app-for-update
       download-app
+      get-app-info
+      get-app-info-by-id
       get-latest-version
 
 sbclient is broken into several smaller commands. Credentials for Splunkbase can be passed as
@@ -59,6 +61,19 @@ available.
       --version TEXT      Version of app to download, default is latest
       --help              Show this message and exit.
 
+### get-app-info
+
+`get-app-info` will lookup the app by name on Splunkbase and return available metadata as JSON string.
+
+    Usage: sbclient get-app-info APP_NAME
+
+### get-app-info-by-id
+
+`get-app-info-by-id` will lookup the app by id on Splunkbase and return available metadata as JSON string.
+
+    Usage: sbclient get-app-info-by-id APP_ID
+
+> **Note**: This is very helpful to retrieve metadata (such as the name of an app) by just having the ID of an app. You can find the ID of each app by looking at the URL of the app on Splunkbase - it's just the last URL path. E.g. https://splunkbase.splunk.com/app/2890 is the URL for the machine learning toolkit on Splunkbase and 2890 is its ID.
 
 ### get-latest-version
 

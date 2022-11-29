@@ -138,7 +138,7 @@ class SplunkbaseSession(requests.Session):
         return {
             "version": release["title"],
             "app": BytesIO(r.content),
-            "author": release["manifest"]["info"]["author"][0],
+            "author": release["manifest"]["info"]["author"][0] if release["manifest"] else "",
             "appid": data["appid"],
             "release_notes": release["notes"],
             "release_date": dateparse(release["published_time"])

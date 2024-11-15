@@ -77,7 +77,7 @@ class SplunkbaseSession(requests.Session):
             return None
         r = self.get(
             "/api/v1/app/%s/" % app_id,
-            params={"include": "all"}
+            params={"include": "release,releases"}
         )
         if r.status_code != 200:
             # Didn't find the app

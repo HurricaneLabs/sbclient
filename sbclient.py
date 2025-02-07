@@ -64,7 +64,7 @@ class SplunkbaseSession(requests.Session):
         return super(SplunkbaseSession, self).prepare_request(request)
 
     def get_app_numeric_id(self, app_name):
-        r = self.get("https://apps.splunk.com/apps/id/%s" % app_name, allow_redirects=False)
+        r = self.get("/apps/id/%s" % app_name, allow_redirects=False)
         if r.status_code != 302:
             # Didn't find the app
             return None
